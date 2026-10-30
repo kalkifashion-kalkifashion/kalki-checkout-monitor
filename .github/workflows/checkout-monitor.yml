@@ -1,0 +1,57 @@
+name: Checkout monitor
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: kalki-checkout-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    name: Full checkout matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      MONITOR_MAX_WORKERS: '2'
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      GITHUB_TOKEN: ${{ github.token }}
+      KALKI_IN_PRODUCT_URL: ${{ vars.KALKI_IN_PRODUCT_URL }}
+      KALKI_US_PRODUCT_URL: ${{ vars.KALKI_US_PRODUCT_URL }}
+      KALKI_UK_PRODUCT_URL: ${{ vars.KALKI_UK_PRODUCT_URL }}
+      KALKI_GLOBAL_PRODUCT_URL: ${{ vars.KALKI_GLOBAL_PRODUCT_URL }}
+      KALKI_IN_SHIPPING_JSON: ${{ vars.KALKI_IN_SHIPPING_JSON }}
+      KALKI_US_SHIPPING_JSON: ${{ vars.KALKI_US_SHIPPING_JSON }}
+      KALKI_UK_SHIPPING_JSON: ${{ vars.KALKI_UK_SHIPPING_JSON }}
+      KALKI_GLOBAL_SHIPPING_JSON: ${{ vars.KALKI_GLOBAL_SHIPPING_JSON }}
+      KALKI_IN_EMAIL: ${{ secrets.KALKI_IN_EMAIL }}
+      KALKI_IN_PASSWORD: ${{ secrets.KALKI_IN_PASSWORD }}
+      KALKI_US_EMAIL: ${{ secrets.KALKI_US_EMAIL }}
+      KALKI_US_PASSWORD: ${{ secrets.KALKI_US_PASSWORD }}
+      KALKI_UK_EMAIL: ${{ secrets.KALKI_UK_EMAIL }}
+      KALKI_UK_PASSWORD: ${{ secrets.KALKI_UK_PASSWORD }}
+      KALKI_GLOBAL_EMAIL: ${{ secrets.KALKI_GLOBAL_EMAIL }}
+      KALKI_GLOBAL_PASSWORD: ${{ secrets.KALKI_GLOBAL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run checkout monitors
+        run: npm test
+      - name: Preserve reports and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-monitor-artifacts-${{ github.run_number }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
